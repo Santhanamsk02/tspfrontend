@@ -14,26 +14,27 @@ import "ace-builds/src-noconflict/ext-language_tools";
 import "ace-builds/src-noconflict/ext-beautify";
 import "ace-builds/src-noconflict/ext-error_marker";
 
-// Languages
-import "ace-builds/src-noconflict/mode-javascript";
+// Languages - Only Python
 import "ace-builds/src-noconflict/mode-python";
-import "ace-builds/src-noconflict/mode-java";
-import "ace-builds/src-noconflict/mode-c_cpp";
 
 // Themes
 import "ace-builds/src-noconflict/theme-dracula";
 
-// Workers
-import "ace-builds/src-noconflict/worker-javascript";
-
-// Snippets
-import "ace-builds/src-noconflict/snippets/javascript";
+// Snippets - Only Python
 import "ace-builds/src-noconflict/snippets/python";
-import "ace-builds/src-noconflict/snippets/java";
-import "ace-builds/src-noconflict/snippets/c_cpp";
 
 
 function Test() {
+  // Load Pyodide script if not already loaded
+  useEffect(() => {
+    if (!window.loadPyodide) {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/pyodide/v0.28.2/full/pyodide.js';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
   const [recording, setRecording] = useState(false);
     const mediaRecorderRef = useRef(null);
     const chunksRef = useRef([]);
@@ -68,8 +69,9 @@ const [code, setCode] = useState("");
     const [resizeCount, setResizeCount] = useState(0);
     const [isMobile, setIsMobile] = useState(false);
   const [browserError, setBrowserError] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [progress, setProgress] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [pyodide, setPyodide] = useState(null);
 
 const showSingleToast = (message, type = "error") => {
 if (activeToastIdRef.current) return;
@@ -86,7 +88,21 @@ if (activeToastIdRef.current) return;
   useEffect(() => {
     fetch("https://marqueebackend.onrender.com/admin/codingquestions")
       .then(res => res.json())
-      .then(data => setQuestions(data[0].Coding));
+      .then(data => {
+        console.log("Fetched questions data:", data);
+        console.log("Coding questions:", data[0]?.Coding);
+        setQuestions(data[0].Coding);
+      })
+      .catch(error => {
+        console.error("Error fetching questions:", error);
+        // Set some default questions for testing
+        setQuestions([
+          {
+            question: "Write a function that prints 'Hello, World!'",
+            expectedOutput: "Hello, World!\n"
+          }
+        ]);
+      });
   }, []);
   useEffect(() => {
   const goFullscreen = () => {
@@ -112,49 +128,34 @@ if (activeToastIdRef.current) return;
   return () => document.removeEventListener("click", goFullscreen);
 });
   const defaultCode = {
-    javascript: "// JavaScript code\nfunction hello() {\n  console.log('Hello, world!');\n}",
-    python: "# Python code\ndef hello():\n    print('Hello, world!')\n    return True",
-    java: "// Java code\npublic class Hello {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, world!\");\n    }\n}",
-    c_cpp: "// C code\n#include <stdio.h>\n\nint main() {\n     printf('Hello World');\n    return 0;\n}"
+    python: "# Start coding here..."
   };
 
-  // Example error highlighting function
+  // Example error highlighting function for Python
   const validateCode = (code) => {
     const newAnnotations = [];
     const newMarkers = [];
     const lines = code.split("\n");
 
     lines.forEach((line, index) => {
-      if (language === "javascript") {
-        if (line.includes("console.log")) {
-          newAnnotations.push({
-            row: index,
-            column: line.indexOf("console.log"),
-            text: "Consider removing console.log for production code",
-            type: "warning",
-          });
-        }
-        if (line.includes("var ")) {
-          newAnnotations.push({
-            row: index,
-            column: line.indexOf("var "),
-            text: "Use let or const instead of var",
-            type: "warning",
-          });
-        }
+      // Python-specific validations
+      if (line.includes("print(") && !line.trim().endsWith(")")) {
+        newAnnotations.push({
+          row: index,
+          column: line.indexOf("print("),
+          text: "Check syntax for print statement",
+          type: "warning",
+        });
+      }
+      if (line.includes("def ") && !line.trim().endsWith(":")) {
+        newAnnotations.push({
+          row: index,
+          column: line.indexOf("def "),
+          text: "Function definition should end with ':'",
+          type: "error",
+        });
       }
     });
-
-    if (lines.length >= 3) {
-      newMarkers.push({
-        startRow: 1,
-        startCol: 0,
-        endRow: 1,
-        endCol: 10,
-        className: "error-marker",
-        type: "fullLine",
-      });
-    }
 
     setAnnotations(newAnnotations);
     setMarkers(newMarkers);
@@ -164,10 +165,10 @@ if (activeToastIdRef.current) return;
     validateCode(code);
   }, [code, language]);
 
-  const handleModeChange = (e) => {
-    const newMode = e.target.value;
-    setLanguage(newMode);
-    setCode(defaultCode[newMode] || "// Start coding here...");
+  const handleModeChange = () => {
+    // Only Python is supported
+    setLanguage("python");
+    setCode(defaultCode["python"] || "# Start coding here...");
   };
 
   const handleFontSizeChange = (e) => {
@@ -235,18 +236,18 @@ if (activeToastIdRef.current) return;
 
 
   useEffect(() => {
-    const loadModels = async () => {
+    const loadModelsAndPyodide = async () => {
         setIsLoading(true);
       const MODEL_URL = '/models';
       try {
-             // Simulate progress for better UX
-             setProgress(30);
+             // Load face detection models
+             setProgress(20);
              await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
              
-             setProgress(60);
+             setProgress(40);
              await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL);
              
-             setProgress(80);
+             setProgress(60);
              // Load the model fileset
              const vision = await FilesetResolver.forVisionTasks(
                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
@@ -262,17 +263,38 @@ if (activeToastIdRef.current) return;
                runningMode: "VIDEO",
              });
              
+             // Load Python Runtime
+             setProgress(80);
+             console.log("Loading Python Runtime...");
+             
+             // Wait for script to load if not already available
+             let attempts = 0;
+             while (!window.loadPyodide && attempts < 50) {
+               await new Promise(resolve => setTimeout(resolve, 100));
+               attempts++;
+             }
+             
+             if (!window.loadPyodide) {
+               throw new Error("Python Runtime script failed to load");
+             }
+             
+             const pyodideInstance = await window.loadPyodide({
+               indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.2/full/"
+             });
+             console.log("Python Runtime loaded successfully:", pyodideInstance);
+             setPyodide(pyodideInstance);
+             
              setProgress(100);
              setTimeout(() => setIsLoading(false), 500);
              startVideo();
            } catch (error) {
-             console.error('Error loading models:', error);
-             setDeviceError("Failed to load detection models. Please refresh and try again.");
+             console.error('Error loading models or Python Runtime:', error);
+             setDeviceError("Failed to load detection models or Python Runtime. Please refresh and try again.");
              setIsLoading(false);
            }
          };
      
-         loadModels();
+         loadModelsAndPyodide();
        }, []);
 
   
@@ -704,49 +726,98 @@ useEffect(() => {
   };
 
   const handleCompile = async () => {
+    console.log("handleCompile called, pyodide state:", pyodide);
+    
+    if (!pyodide) {
+      setOutput("❌ Python Runtime not loaded yet. Please wait...");
+      console.log("Python Runtime not loaded yet");
+      return;
+    }
+
     const endTime = Date.now();
     const question = information[index];
     
+    console.log("Current question object:", question);
+    console.log("Expected output:", question?.expectedOutput);
+    console.log("Expected output type:", typeof question?.expectedOutput);
+    
+    if (!question) {
+      setOutput("❌ Error: No question data available");
+      return;
+    }
+    
+    try {
+      console.log("Executing code:", code);
+      
+      // Capture stdout
+      let output = "";
+      pyodide.runPython(`
+import sys
+from io import StringIO
+sys.stdout = StringIO()
+      `);
 
-    const res = await fetch("https://marqueebackend.onrender.com/compile", {
-      method: "POST",
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      // Execute user code
+      pyodide.runPython(code);
+      
+      // Get the output
+      output = pyodide.runPython("sys.stdout.getvalue()");
+      
+      // Reset stdout
+      pyodide.runPython("sys.stdout = sys.__stdout__");
+      
+      console.log("Code execution output:", output);
+      
+      // Check if output matches expected output
+      const expectedOutput = question.expectedOutput ? String(question.expectedOutput).trim() : "";
+      const actualOutput = output ? String(output).trim() : "";
+      const success = actualOutput === expectedOutput;
+      
+      console.log("Expected:", expectedOutput);
+      console.log("Actual:", actualOutput);
+      console.log("Success:", success);
+      
+      setOutput(success ? `✅ ${output}` : `❌ Expected: ${expectedOutput}\nGot: ${actualOutput}`);
+      
+      const questionTime = Math.floor((endTime - startTime) / 1000);
+
+      const resultData = {
+        title: information[index].question,
         code,
-        language,
-        expected_output: question.expectedOutput
-      })
-    });
+        language: "python",
+        expected_output: question.expectedOutput || "",
+        output: actualOutput,
+        success: success,
+        malpractice,
+        malpractice_type: malpracticeType,
+        timeTaken: questionTime
+      };
 
-    const data = await res.json();
-    console.log(data);
-    if (data.error == "")
-    {
-    setOutput(data.success ? " ✅"+data.output : " ❌"+data.output);
+      const newResults = [...results];
+      newResults[index] = resultData;
+      setResults(newResults);
+
+    } catch (error) {
+      console.error("Code execution error:", error);
+      setOutput(`❌ Error: ${error.message}`);
+      
+      const questionTime = Math.floor((endTime - startTime) / 1000);
+      const resultData = {
+        title: information[index].question,
+        code,
+        language: "python",
+        expected_output: question.expectedOutput || "",
+        output: `Error: ${error.message}`,
+        success: false,
+        malpractice,
+        malpractice_type: malpracticeType,
+        timeTaken: questionTime
+      };
+
+      const newResults = [...results];
+      newResults[index] = resultData;
+      setResults(newResults);
     }
-    else
-    {
-    setOutput(data.success ? " ✅"+data.output : " ❌"+data.error);
-
-    }
-
-    const questionTime = Math.floor((endTime - startTime) / 1000);
-
-    const resultData = {
-      title: information[index].question,
-      code,
-      language,
-      expected_output: information[index].expectedOutput,
-      output: data.output,
-      success: data.success,
-      malpractice,
-      malpractice_type: malpracticeType,
-      timeTaken: questionTime
-    };
-
-    const newResults = [...results];
-    newResults[index] = resultData;
-    setResults(newResults);
 
     setStartTime(Date.now());
   };
@@ -805,7 +876,7 @@ useEffect(() => {
           <div className="loading-content">
             <div className="loading-spinner"></div>
             <h2>Loading Exam Environment</h2>
-            <p>Setting up Your Face Detection And Speech Detecting Exam Portal...</p>
+            <p>Setting up Face Detection and Python Runtime...</p>
             <div className="progress-bar">
               <div className="progress-fill" style={{width: `${progress}%`}}></div>
             </div>
@@ -871,11 +942,9 @@ useEffect(() => {
               borderRadius: "4px",
               border: "1px solid #ccc",
             }}
+            disabled
           >
-            <option value="javascript">JavaScript</option>
-            <option value="python">Python</option>
-            <option value="java">Java</option>
-            <option value="c_cpp">C</option>
+            <option value="python">Python (Client-side)</option>
                   </select>
                   <div>
           <label htmlFor="font-size" className='me-2'>Font Size: </label>
@@ -915,10 +984,15 @@ useEffect(() => {
         </div>
                   
                   <button 
-                    className="btn btn-primary compile-btn"
-                    onClick={handleCompile}
+                    className={`btn ${pyodide ? 'btn-primary' : 'btn-secondary'} compile-btn`}
+                    onClick={() => {
+                      console.log("Run Code button clicked");
+                      handleCompile();
+                    }}
+                    disabled={!pyodide}
+                    title={pyodide ? 'Python Runtime ready' : 'Loading Python Runtime...'}
                   >
-                    <i className="bi bi-play-fill"></i> Run Code
+                    <i className="bi bi-play-fill"></i> {pyodide ? 'Run Code' : 'Loading Python Runtime...'}
                   </button>
                   <div className="time-display">
           <i className="bi bi-clock"></i> {formatTime(timeTaken)}
@@ -938,7 +1012,7 @@ useEffect(() => {
         }}
       >
         <AceEditor
-          mode={language}
+          mode="python"
           theme="dracula"
           name="UNIQUE_ID_OF_DIV"
           onChange={setCode}
