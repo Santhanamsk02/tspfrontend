@@ -1626,7 +1626,7 @@ font-size: 20px;
   display: flex !important;
   align-items: center;
   gap: 0.5rem;
-} */
+}
 
 .timer-container {
   display: flex !important;
@@ -2028,6 +2028,7 @@ font-size: 20px;
           margin: 0;
           background: linear-gradient(90deg, #3b82f6, #8b5cf6);
           -webkit-background-clip: text;
+          background-clip: text;
           -webkit-text-fill-color: transparent;
         }
         
