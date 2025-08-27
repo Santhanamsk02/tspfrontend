@@ -40,6 +40,7 @@ function MCQTest() {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
+  const [esccount, setescCount] = useState(0);
 
 
 const showSingleToast = (message, type = "error") => {
@@ -160,11 +161,15 @@ if (activeToastIdRef.current) return;
     setMalpracticeType(prev => [...new Set([...prev, type])]);
     const screenshot = captureScreenshot(); 
     setExamFinished(true);
+    setShowPopup(true);
     const username = localStorage.getItem("token");
     let done = parseInt(localStorage.getItem("done"));
     let department =localStorage.getItem("department");
      let year =   localStorage.getItem("year");
-    let section=  localStorage.getItem("section");
+    let section = localStorage.getItem("section");
+    let name = localStorage.getItem("name");
+    let regno = localStorage.getItem("regno");
+
    
     done = done + 1;
 
@@ -190,13 +195,14 @@ if (activeToastIdRef.current) return;
         restrict: true,
         department,
         year,
+        name,
+        regno,
         section,
         doneTest:"MCQ",
         screenshot
       }),
     });
 
-    setShowPopup(true);
     
     setTimeout(() => {
       localStorage.removeItem("token");
@@ -583,6 +589,9 @@ useEffect(() => {
     let department =localStorage.getItem("department");
      let year =   localStorage.getItem("year");
     let section = localStorage.getItem("section");
+     let name = localStorage.getItem("name");
+    let regno = localStorage.getItem("regno");
+
     done = done + 1;
     setShowCompletionPopup(true);
     const screenshot = captureScreenshot(); 
@@ -610,7 +619,9 @@ useEffect(() => {
         department,
         year,
         section,
-        doneTest:"MCQ",
+        doneTest: "MCQ",
+        name,
+        regno
       }),
     });
 
@@ -676,12 +687,18 @@ useEffect(() => {
     };
    
     
-     const handleKeyDown = (e) => {
+    const handleKeyDown = (e) => {
+      if (esccount > 3)
+      {
+        handleMalpractice("Pressed Escape");
+      }
     if (e.key === "Escape") {
       e.preventDefault();
       showSingleToast('please Do Not Press Escape', "warning");
+      setescCount(prev => prev + 1);
        }
-       if (e.keyCode === 122) {
+      if (e.keyCode === 122) {
+      setescCount(prev => prev + 1);
       e.preventDefault();
       showSingleToast('please Do Not Press Escape', "warning");
        }

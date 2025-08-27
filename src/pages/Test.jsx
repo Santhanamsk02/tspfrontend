@@ -14,28 +14,22 @@ import "ace-builds/src-noconflict/ext-language_tools";
 import "ace-builds/src-noconflict/ext-beautify";
 import "ace-builds/src-noconflict/ext-error_marker";
 
-// Languages
-import "ace-builds/src-noconflict/mode-javascript";
 import "ace-builds/src-noconflict/mode-python";
-import "ace-builds/src-noconflict/mode-java";
-import "ace-builds/src-noconflict/mode-c_cpp";
 
 // Themes
 import "ace-builds/src-noconflict/theme-dracula";
 
-// Workers
-import "ace-builds/src-noconflict/worker-javascript";
 
-// Snippets
-import "ace-builds/src-noconflict/snippets/javascript";
+
+
 import "ace-builds/src-noconflict/snippets/python";
-import "ace-builds/src-noconflict/snippets/java";
-import "ace-builds/src-noconflict/snippets/c_cpp";
+
 
 
 function Test() {
   const [recording, setRecording] = useState(false);
-    const mediaRecorderRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+    const [esccount, setescCount] = useState(0);
     const chunksRef = useRef([]);
     const activeToastIdRef = useRef(null);
   const [information, setQuestions] = useState([]);
@@ -69,7 +63,8 @@ const [code, setCode] = useState("");
     const [isMobile, setIsMobile] = useState(false);
   const [browserError, setBrowserError] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [pyodide, setPyodide] = useState(null);
 
 const showSingleToast = (message, type = "error") => {
 if (activeToastIdRef.current) return;
@@ -82,6 +77,15 @@ if (activeToastIdRef.current) return;
   });
 
   };
+  useEffect(() => {
+    if (!window.loadPyodide) {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/pyodide/v0.28.2/full/pyodide.js';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
 
   useEffect(() => {
     fetch("https://marqueebackend.onrender.com/admin/codingquestions")
@@ -112,10 +116,7 @@ if (activeToastIdRef.current) return;
   return () => document.removeEventListener("click", goFullscreen);
 });
   const defaultCode = {
-    javascript: "// JavaScript code\nfunction hello() {\n  console.log('Hello, world!');\n}",
     python: "# Python code\ndef hello():\n    print('Hello, world!')\n    return True",
-    java: "// Java code\npublic class Hello {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, world!\");\n    }\n}",
-    c_cpp: "// C code\n#include <stdio.h>\n\nint main() {\n     printf('Hello World');\n    return 0;\n}"
   };
 
   // Example error highlighting function
@@ -123,27 +124,6 @@ if (activeToastIdRef.current) return;
     const newAnnotations = [];
     const newMarkers = [];
     const lines = code.split("\n");
-
-    lines.forEach((line, index) => {
-      if (language === "javascript") {
-        if (line.includes("console.log")) {
-          newAnnotations.push({
-            row: index,
-            column: line.indexOf("console.log"),
-            text: "Consider removing console.log for production code",
-            type: "warning",
-          });
-        }
-        if (line.includes("var ")) {
-          newAnnotations.push({
-            row: index,
-            column: line.indexOf("var "),
-            text: "Use let or const instead of var",
-            type: "warning",
-          });
-        }
-      }
-    });
 
     if (lines.length >= 3) {
       newMarkers.push({
@@ -164,11 +144,13 @@ if (activeToastIdRef.current) return;
     validateCode(code);
   }, [code, language]);
 
-  const handleModeChange = (e) => {
-    const newMode = e.target.value;
-    setLanguage(newMode);
-    setCode(defaultCode[newMode] || "// Start coding here...");
-  };
+
+     const handleModeChange = (e) => {
+    // Only Python is supported
+    setLanguage("python");
+    setCode(defaultCode["python"] || "# Start coding here...");
+    };
+    
 
   const handleFontSizeChange = (e) => {
     setFontSize(parseInt(e.target.value));
@@ -187,14 +169,16 @@ if (activeToastIdRef.current) return;
     
     setMalpractice(true);
     setExamFinished(true);
+    setShowPopup(true);
     
     const username = localStorage.getItem("token");
     let done = parseInt(localStorage.getItem("done"))
     let donetest = localStorage.getItem("doneTest");
     let department =localStorage.getItem("department");
      let year =   localStorage.getItem("year");
-    let section=  localStorage.getItem("section");
-
+    let section = localStorage.getItem("section");
+     let name = localStorage.getItem("name");
+    let regno = localStorage.getItem("regno");
 
     done = done + 1;
     const resultData = {
@@ -216,16 +200,17 @@ if (activeToastIdRef.current) return;
       body: JSON.stringify({ username, results: newResults,totalMarks: newResults.filter(r => r?.success).length,test_type:"Coding",malpractice:detectedType,done,restrict:true,screenshot,doneTest:"Coding", department,
         year,
         section,
+        name,
+        regno
          })
     });
 
     
-    setShowPopup(true);
 
     setTimeout(() => {
       localStorage.removeItem("token");
       window.location.href = "/login";
-    }, 1500);
+    }, 500);
 
   };
   useEffect(() => {
@@ -240,13 +225,13 @@ if (activeToastIdRef.current) return;
       const MODEL_URL = '/models';
       try {
              // Simulate progress for better UX
-             setProgress(30);
+             setProgress(20);
              await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
              
-             setProgress(60);
+             setProgress(40);
              await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL);
              
-             setProgress(80);
+             setProgress(60);
              // Load the model fileset
              const vision = await FilesetResolver.forVisionTasks(
                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
@@ -261,8 +246,28 @@ if (activeToastIdRef.current) return;
                scoreThreshold: 0.5,
                runningMode: "VIDEO",
              });
+            setProgress(80);
+             console.log("Loading Python Runtime...");
+             
+             // Wait for script to load if not already available
+             let attempts = 0;
+             while (!window.loadPyodide && attempts < 50) {
+               await new Promise(resolve => setTimeout(resolve, 100));
+               attempts++;
+             }
+             
+             if (!window.loadPyodide) {
+               throw new Error("Python Runtime script failed to load");
+             }
+             
+             const pyodideInstance = await window.loadPyodide({
+               indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.2/full/"
+             });
+             console.log("Python Runtime loaded successfully:", pyodideInstance);
+             setPyodide(pyodideInstance);
              
              setProgress(100);
+             
              setTimeout(() => setIsLoading(false), 500);
              startVideo();
            } catch (error) {
@@ -328,12 +333,18 @@ useEffect(() => {
     };
    
     
-     const handleKeyDown = (e) => {
-    if (e.key === "Escape") {
+  const handleKeyDown = (e) => {
+    if (esccount > 3)
+    {
+      handleMalpractice("Pressed Escape");
+    }
+       if (e.key === "Escape") {
+         setescCount(prev => prev + 1);
       e.preventDefault();
       showSingleToast('please Do Not Press Escape', "warning");
        }
        if (e.keyCode === 122) {
+        setescCount(prev => prev + 1);
       e.preventDefault();
       showSingleToast('please Do Not Press Escape', "warning");
        }
@@ -706,43 +717,112 @@ useEffect(() => {
   const handleCompile = async () => {
     const endTime = Date.now();
     const question = information[index];
-    
-
-    const res = await fetch("https://marqueebackend.onrender.com/compile", {
-      method: "POST",
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code,
-        language,
-        expected_output: question.expectedOutput
-      })
-    });
-
-    const data = await res.json();
-    console.log(data);
-    if (data.error == "")
-    {
-    setOutput(data.success ? " ✅"+data.output : " ❌"+data.output);
+      if (!pyodide) {
+      setOutput("❌ Python Runtime not loaded yet. Please wait...");
+      console.log("Python Runtime not loaded yet");
+      return;
     }
-    else
-    {
-    setOutput(data.success ? " ✅"+data.output : " ❌"+data.error);
+  const suspiciousPatterns = [
+  // 1. Direct constant print (numbers or simple strings only, no expressions or functions)
+  /^print\s*\(\s*(["'].*?["']|\d+)\s*\)\s*$/m,
 
+  // 2. If True wrapper with trivial constant print
+  /^\s*if\s+True\s*:\s*\n\s*print\s*\(\s*(["'].*?["']|\d+)\s*\)\s*$/m,
+
+  // 3. While False wrapper with trivial constant print
+  /^\s*while\s+False\s*:\s*\n\s*print\s*\(\s*(["'].*?["']|\d+)\s*\)\s*$/m,
+
+  // 4. Function wrapping only trivial constant print
+  /^\s*def\s+\w+\s*\([^)]*\)\s*:\s*\n\s*print\s*\(\s*(["'].*?["']|\d+)\s*\)\s*$/m,
+
+  // 5. Comment tricks containing trivial print
+  /#\s*(if|while|for|def).*print\s*\(\s*(["'].*?["']|\d+)\s*\)$/m,
+
+  // 6. Only prints with constants (multiple lines of only simple prints)
+  /^(?:\s*print\s*\(\s*(["'].*?["']|\d+)\s*\)\s*)+$/m,
+
+  // 7. Print with constant expressions only (like 5*24, 10+20 etc., but no variables or functions)
+  /^print\s*\(\s*[\d\s\+\-\*\/%]+\s*\)$/m,
+
+  // 8. File contains only trivial print statements (no logic keywords, only constants)
+  /^(?!.*\b(for|while|def|return|input|if)\b)(?=.*print\(\s*(["'].*?["']|\d+)\s*\)).*$/s
+];
+
+
+  const codeTrimmed = code.trim();
+  let isMalpractice = suspiciousPatterns.some((regex) => regex.test(codeTrimmed));
+
+    if (isMalpractice) {
+      setOutput("❌ Respected Participant We Know You are Very Very Brilliant Student, Please Write The Logic Don't Use Only Print Statement");
     }
+    else {
+      try {
+        console.log("Executing code:", code);
+      
+        // Capture stdout
+        let output = "";
+        pyodide.runPython(`
+import sys
+from io import StringIO
+sys.stdout = StringIO()
+      `);
 
-    const questionTime = Math.floor((endTime - startTime) / 1000);
-
-    const resultData = {
-      title: information[index].question,
-      code,
-      language,
-      expected_output: information[index].expectedOutput,
-      output: data.output,
-      success: data.success,
-      malpractice,
-      malpractice_type: malpracticeType,
-      timeTaken: questionTime
-    };
+        // Execute user code
+        pyodide.runPython(code);
+      
+        // Get the output
+        output = pyodide.runPython("sys.stdout.getvalue()");
+      
+        // Reset stdout
+        pyodide.runPython("sys.stdout = sys.__stdout__");
+      
+        console.log("Code execution output:", output);
+      
+        // Check if output matches expected output
+        const expectedOutput = question.expectedOutput ? String(question.expectedOutput).trim() : "";
+        const actualOutput = output ? String(output).trim() : "";
+        const success = actualOutput === expectedOutput;
+      
+        console.log("Expected:", expectedOutput);
+        console.log("Actual:", actualOutput);
+        console.log("Success:", success);
+      
+        setOutput(success ? `✅ ${output}` : `❌ Expected: ${expectedOutput}\nGot: ${actualOutput}`);
+      
+        const questionTime = Math.floor((endTime - startTime) / 1000);
+        const resultData = {
+          title: information[index].question,
+          code,
+          language: "python",
+          expected_output: question.expectedOutput || "",
+          output: actualOutput,
+          success: success,
+          malpractice,
+          malpractice_type: malpracticeType,
+          timeTaken: questionTime
+        };
+        const newResults = [...results];
+        newResults[index] = resultData;
+        setResults(newResults);
+      }
+      catch (error) {
+        console.error("Code execution error:", error);
+        setOutput(`❌ Error: ${error.message}`);
+      
+        const questionTime = Math.floor((endTime - startTime) / 1000);
+        const resultData = {
+          title: information[index].question,
+          code,
+          language: "python",
+          expected_output: question.expectedOutput || "",
+          output: `Error: ${error.message}`,
+          success: false,
+          malpractice,
+          malpractice_type: malpracticeType,
+          timeTaken: questionTime
+        };
+      }
+    }
 
     const newResults = [...results];
     newResults[index] = resultData;
@@ -772,7 +852,8 @@ useEffect(() => {
     let department =localStorage.getItem("department");
      let year =   localStorage.getItem("year");
     let section=  localStorage.getItem("section");
-    
+     let name = localStorage.getItem("name");
+    let regno = localStorage.getItem("regno");
     
 
     const screenshot = captureScreenshot();
@@ -785,6 +866,8 @@ useEffect(() => {
         username, results: results,totalMarks: results.filter(r => r?.success).length,test_type:"Coding",malpractice:false,done,screenshot, department,
         year,
         section,
+        name,
+        regno,
         restrict:false,
         doneTest:"Coding",
        })
@@ -872,10 +955,7 @@ useEffect(() => {
               border: "1px solid #ccc",
             }}
           >
-            <option value="javascript">JavaScript</option>
             <option value="python">Python</option>
-            <option value="java">Java</option>
-            <option value="c_cpp">C</option>
                   </select>
                   <div>
           <label htmlFor="font-size" className='me-2'>Font Size: </label>
@@ -1248,6 +1328,18 @@ useEffect(() => {
           </div>
         </div>
       )}
+       {deviceError && (
+        <div className={`malpractice-modal visible`}>
+          <div className="modal-content animate__animated animate__headShake">
+            <div className="modal-icon">
+              <i className="bi bi-exclamation-octagon"></i>
+            </div>
+            <h3>No Webcam Or Mic Detected</h3>
+            <p>Please Ensure You Have A Proper WebCam or Mic And Switch On Both Of Them Please</p>
+            <p>Your test is being Hold</p>
+          </div>
+        </div>
+        )}
     </div>
   );
 }

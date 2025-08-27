@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState,useRef } from "react";
 
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const username = localStorage.getItem("token");
+    const detectorRef = useRef(null);
+  
 
   useEffect(() => {
     fetch(`https://marqueebackend.onrender.com/user-profile/${username}`)

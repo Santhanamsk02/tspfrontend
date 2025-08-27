@@ -22,7 +22,13 @@ export default function Students() {
   const [students, setStudents] = useState([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [searchRollNo, setSearchRollNo] = useState("");
+
+// filtered students
+
   const [loading, setLoading] = useState(true);
+  const [editStudent, setEditStudent] = useState(null);
+
 
   const formik = useFormik({
     initialValues: {
@@ -78,6 +84,22 @@ export default function Students() {
   const closeModal = () => {
     setSelectedStudent(null);
   };
+const handleSearch = async () => {
+  if (!searchRollNo.trim()) {
+    fetchStudents(); // If empty, load all students again
+    return;
+  }
+
+  try {
+    const res = await fetch(`https://marqueebackend.onrender.com/admin/students?rollno=${searchRollNo}`);
+    const data = await res.json();
+    setStudents(data);
+  } catch (error) {
+    console.error("Error fetching students:", error);
+  }
+};
+
+  
 const fileInputRef = useRef(null);
 
   const handleFileChange = async (e) => {
@@ -206,7 +228,7 @@ const fileInputRef = useRef(null);
             </div>
 
             <div className="form-group">
-              <label>Class & Section</label>
+              <label>Class</label>
               <input
                 name="classSection"
                 value={formik.values.classSection}
@@ -289,16 +311,31 @@ const fileInputRef = useRef(null);
       </div>
 
       <div className="students-list-section">
-        <h3 className="gradient-text">Existing Students ({students.length})</h3>
+
+        <h3 className="gradient-text">Existing Students ({students.total})</h3>
         
         {loading ? (
-          <div className="loading-spinner">
-            <div className="spinner"></div>
+          <div className="std-loading-spinner">
+            <div className="std-spinner"></div>
           </div>
         ) : (
-          <div className="students-grid">
-            {students.map((student, index) => (
-              <div key={student._id} className="student-card animate__animated animate__fadeInUp" 
+            <div>
+                     <div className="search-bar">
+                <div className="search-bar mb-3 search-form-group d-flex">
+                  <input
+                    type="text"
+                    placeholder="Search by Roll No"
+                    className="w-50"
+                    value={searchRollNo}
+                    onChange={(e) => setSearchRollNo(e.target.value)}
+  
+                  />
+                  <button onClick={handleSearch} className="submit-btn ms-4">Search</button>
+                </div>
+              </div>
+            <div className="students-grid">
+            {students.students.map((student, index) => (
+              <div key={index} className="student-card animate__animated animate__fadeInUp" 
                 style={{ animationDelay: `${index * 0.05}s` }}>
                 <div className="student-info">
                   <h4>{student.name}</h4>
@@ -316,6 +353,7 @@ const fileInputRef = useRef(null);
                 </button>
               </div>
             ))}
+              </div>
           </div>
         )}
       </div>
@@ -323,7 +361,7 @@ const fileInputRef = useRef(null);
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="modal-overlay">
-          <div className="success-modal-sadd animate__animated animate__zoomIn">
+          <div className="success-modal animate__animated animate__zoomIn">
             <div className="success-icon">
               <i className="bi bi-check-circle-fill"></i>
             </div>
@@ -375,17 +413,233 @@ const fileInputRef = useRef(null);
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Class & Section:</span>
-                  <span className="detail-value">{selectedStudent.classSection}</span>
+                  <span className="detail-value">{selectedStudent.Class}</span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Year:</span>
+                  <span className="detail-value">{selectedStudent.Year}</span>
+                </div><div className="detail-item">
+                  <span className="detail-label">Restrict:</span>
+                  <span className="detail-value">{selectedStudent.restrict?"True":"False"}</span>
+                </div><div className="detail-item">
+                  <span className="detail-label">Done Test:</span>
+                  <span className="detail-value">{selectedStudent.doneTest?selectedStudent.doneTest:"None"}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">CGPA:</span>
                   <span className="detail-value">{selectedStudent.cgpa}</span>
                 </div>
               </div>
+              <button 
+  className="submit-btn mt-4"
+  onClick={() => {
+    setEditStudent(selectedStudent);
+    closeModal();
+  }}
+>
+  <i className="bi bi-pencil-fill"></i> Edit Student
+</button>
+
             </div>
           </div>
-        </div>
+          </div>
       )}
+      {editStudent && (
+  <div className="modal-overlay">
+    <div className="student-edit-modal animate__animated animate__zoomIn bg-light p-4 rounded rounded-5" style={{width:"80vw"}}>
+      {/* Close Button */}
+      <button className="close-btn" onClick={() => setEditStudent(null)}>
+        <i className="bi bi-x-lg"></i>
+      </button>
+
+      {/* Header */}
+      <div className="modal-header">
+        <h3>Edit Student: {editStudent.name}</h3>
+      </div>
+
+      {/* Form */}
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+                try {
+            console.log(editStudent)
+            const response = await fetch(
+              `https://marqueebackend.onrender.com/admin/students/${editStudent.username}`,
+              {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(editStudent),
+              }
+            );
+            if (!response.ok) throw new Error("Failed to update student");
+
+            await fetchStudents(); // refresh after update
+            setEditStudent(null);
+            alert("✅ Student updated successfully!");
+          }
+          catch (err) {
+            console.error("Update error:", err);
+            alert("❌ Failed to update student");
+          }
+        }}
+      >
+        <div className="form-grid">
+          {/* Name */}
+          <div className="form-group">
+            <label>Name</label>
+            <input
+              type="text"
+              value={editStudent.name || ""}
+              onChange={(e) =>
+                setEditStudent({ ...editStudent, name: e.target.value })
+              }
+            />
+          </div>
+
+          {/* Username */}
+          <div className="form-group">
+            <label>Username</label>
+            <input
+              type="text"
+              value={editStudent.username || ""}
+              onChange={(e) =>
+                setEditStudent({ ...editStudent, username: e.target.value })
+              }
+            />
+          </div>
+
+          {/* Roll No */}
+          <div className="form-group">
+            <label>Roll No</label>
+            <input
+              type="text"
+              value={editStudent.rollno || ""}
+              onChange={(e) =>
+                setEditStudent({ ...editStudent, rollno: e.target.value })
+              }
+            />
+          </div>
+
+          {/* Registration No */}
+          <div className="form-group">
+            <label>Registration No</label>
+            <input
+              type="text"
+              value={editStudent.regno || ""}
+              onChange={(e) =>
+                setEditStudent({ ...editStudent, regno: e.target.value })
+              }
+            />
+          </div>
+
+          {/* Email */}
+          <div className="form-group">
+            <label>Email</label>
+            <input
+              type="email"
+              value={editStudent.email || ""}
+              onChange={(e) =>
+                setEditStudent({ ...editStudent, email: e.target.value })
+              }
+            />
+          </div>
+
+          {/* Mobile */}
+          <div className="form-group">
+            <label>Mobile</label>
+            <input
+              type="text"
+              value={editStudent.mobile || ""}
+              onChange={(e) =>
+                setEditStudent({ ...editStudent, mobile: e.target.value })
+              }
+            />
+          </div>
+
+          {/* Department */}
+          <div className="form-group">
+            <label>Department</label>
+            <input
+              type="text"
+              value={editStudent.department || ""}
+              onChange={(e) =>
+                setEditStudent({ ...editStudent, department: e.target.value })
+              }
+            />
+          </div>
+
+          {/* Class & Section */}
+          <div className="form-group">
+            <label>Class & Section</label>
+            <input
+              type="text"
+              value={editStudent.Class || ""}
+              onChange={(e) =>
+                setEditStudent({ ...editStudent, Class: e.target.value })
+              }
+            />
+          </div>
+
+          {/* Year */}
+          <div className="form-group">
+            <label>Year</label>
+            <input
+              type="number"
+              value={editStudent.Year || ""}
+              onChange={(e) =>
+                setEditStudent({ ...editStudent, Year: e.target.value })
+              }
+            />
+          </div>
+
+          {/* Restrict */}
+          <div className="form-group">
+            <label>Restrict</label>
+            <select
+              value={editStudent.restrict ? "true" : "false"}
+              onChange={(e) =>
+                setEditStudent({ ...editStudent, restrict: e.target.value === "true" })
+              }
+            >
+              <option value="false">False</option>
+              <option value="true">True</option>
+            </select>
+          </div>
+
+          {/* Done Test */}
+          <div className="form-group">
+            <label>Done Test</label>
+            <input
+              type="text"
+              value={editStudent.doneTest || ""}
+              onChange={(e) =>
+                setEditStudent({ ...editStudent, doneTest: e.target.value })
+              }
+            />
+          </div>
+
+          {/* CGPA */}
+          <div className="form-group">
+            <label>CGPA</label>
+            <input
+              type="number"
+              step="0.01"
+              value={editStudent.cgpa || ""}
+              onChange={(e) =>
+                setEditStudent({ ...editStudent, cgpa: e.target.value })
+              }
+            />
+          </div>
+        </div>
+
+        <button type="submit" className="submit-btn mt-3">
+          Save Changes
+        </button>
+      </form>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

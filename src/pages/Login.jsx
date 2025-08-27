@@ -27,12 +27,14 @@ export default function Login() {
           }
       else if (res.status === 200) {
         localStorage.setItem("token", data.token);
+        localStorage.setItem("name", data.name);
         localStorage.setItem("role", data.role);
         localStorage.setItem("done", data.done);
         localStorage.setItem("doneTest", data.doneTest);
         localStorage.setItem("department", data.department);
         localStorage.setItem("year", data.year);
         localStorage.setItem("section", data.section);
+        localStorage.setItem("regno", data.regno);
 
         setShowSuccess(true);
         setTimeout(() => {
